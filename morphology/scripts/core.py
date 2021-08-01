@@ -1,4 +1,6 @@
 import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
 import h5py
 import os
 import re
@@ -62,3 +64,26 @@ def get_index_redshift_dict(assembly='GM-Early'):
 	index_calibration_file_list 	= [fname for fname in os.listdir(assembly_dir)]
 	return dict(zip(map(get_index,index_calibration_file_list),map(get_redshift,index_calibration_file_list)))
 
+def prepare_plot(context='paper',theme='dark',font_scale=1,colours=None,rc_kwparams=dict()):
+	'''
+	Set seaborn styling for plots. Use print(sns.axes_style()) for getting a complete list of style attributes
+	'''
+	rc_params	= {
+		'xtick.bottom': True, 
+		'ytick.left': True, 
+		'axes.spines.left': True, 
+		'axes.spines.bottom': True
+		}
+	rc_params.update(rc_kwparams)			# Update parameters by adding parameters passed to function
+	sns.set_context(context,font_scale=font_scale)
+	sns.set(style=theme,font='TeX Gyre Pagella Math')
+	sns.set_style(rc_params)
+	if colours is None:
+		colours  	= [
+						'#772e51', 		# Red/Magenta (lighter alternative '#923563')
+						'#44b677',		# Green
+						'#66b6d2'		# Blue (alternatives '#88ccee',#94c8e0', '#51abcb')
+					]
+	sns.set_palette(sns.color_palette(colours))
+	return None
+	

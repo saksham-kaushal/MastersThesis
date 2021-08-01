@@ -10,7 +10,19 @@ import core
 def get_angular_momentum(rxv, mass):
 	return np.transpose(np.multiply(mass, np.transpose(rxv)))
 
-def thob_implementation(coords, velocities, masses):
+def get_kappa(coords, velocities, masses):
+	net_velocities  		= np.linalg.norm(velocities,axis=1)
+	rxv						= np.cross(coords,velocities)
+	angular_momenta  		= get_angular_momentum(rxv,masses)
+	total_angular_momentum 	= np.sum(angular_momenta,axis=0)
+	zaxis  					= total_angular_momentum/np.linalg.norm(total_angular_momentum)
+	angular_momentum_mask  	= np.dot(angular_momenta,zaxis)
+	kinetic_energy  		= np.sum(masses*net_velocities**2)
+	rotational_kinetic_energy  	= np.sum((masses*net_velocities**2)[angular_momentum_mask>0])
+	kappa 					= rotational_kinetic_energy/kinetic_energy
+	return kappa.value
+
+def get_kappa_thob_implementation(coords, velocities, masses):
 	distances 		= np.linalg.norm(coords,axis=1)						# 114
 	smomentums  	= np.cross(coords,velocities) 						# 126
 	momentum  		= np.sum(masses[:,np.newaxis]*smomentums,axis=0) 	# 127
@@ -22,8 +34,8 @@ def thob_implementation(coords, velocities, masses):
 	smomentumz 		= np.sum(zaxis*smomentums,axis=1)					# 134
 	vrots 			= smomentumz/cyldistances							# 135
 	Mvrot2 			= np.sum((masses*vrots**2)[vrots>0])				# 139
-	kappa 			= Mvrot2 / np.sum(masses *					# 140
-    	(np.linalg.norm(velocities,axis=1))**2)
+	kappa 			= Mvrot2 / np.sum(masses *
+    				  (np.linalg.norm(velocities,axis=1))**2)			# 140
 	return kappa.value
 
 
@@ -56,16 +68,8 @@ if __name__ == '__main__':
 			coords  				= files[index]['Coordinates']*u.Mpc
 			masses 					= files[index]['Mass']*u.M_sun
 			velocities  			= files[index]['Velocity']*(u.km/u.s)
-			net_velocities  		= np.linalg.norm(velocities,axis=1)
-			rxv						= np.cross(coords,velocities)
-			angular_momenta  		= get_angular_momentum(rxv,masses)
-			total_angular_momentum 	= np.sum(angular_momenta,axis=0)
-			zaxis  					= total_angular_momentum/np.linalg.norm(total_angular_momentum)
-			angular_momentum_mask  	= np.dot(angular_momenta,zaxis)
-			kinetic_energy  		= 0.5*np.sum(masses*net_velocities**2)
-			rotational_kinetic_energy  	= 0.5*np.sum((masses*net_velocities**2)[angular_momentum_mask>0])
-			kappa_co_assembly[index_redshift_dict[index]] 	= (rotational_kinetic_energy/kinetic_energy).value
-			kappa_co_assembly_thob[index_redshift_dict[index]] 	= thob_implementation(coords,velocities,masses)
+			kappa_co_assembly[index_redshift_dict[index]] 		= get_kappa(coords,velocities, masses)
+			kappa_co_assembly_thob[index_redshift_dict[index]] 	= get_kappa_thob_implementation(coords,velocities,masses)
 
 		kappa_co[assembly] 		= kappa_co_assembly
 		kappa_co_thob[assembly] = kappa_co_assembly_thob
@@ -74,7 +78,8 @@ if __name__ == '__main__':
 			files[index].close()
 
 	for assembly in kappa_co:
-		sns.lineplot(x=kappa_co[assembly].keys(),y=kappa_co[assembly].values())
+		core.prepare_plot()
+		# sns.lineplot(x=kappa_co[assembly].keys(),y=kappa_co[assembly].values())
 		sns.lineplot(x=kappa_co_thob[assembly].keys(),y=kappa_co_thob[assembly].values())
 		plt.show()
 
