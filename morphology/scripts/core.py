@@ -4,6 +4,8 @@ import seaborn as sns
 import h5py
 import os
 import re
+import inspect
+from astropy.cosmology import FlatLambdaCDM, z_at_value
 
 
 def get_directory(directory):
@@ -64,6 +66,13 @@ def get_index_redshift_dict(assembly='GM-Early'):
 	index_calibration_file_list 	= [fname for fname in os.listdir(assembly_dir)]
 	return dict(zip(map(get_index,index_calibration_file_list),map(get_redshift,index_calibration_file_list)))
 
+
+def get_time_from_redshift(redshift,cosmology=None):
+	if cosmology is None:
+		cosmology 	= FlatLambdaCDM(100.*0.6777,Om0=0.307,Ob0=0.04825)
+	return cosmology.age(redshift) 
+
+
 def prepare_plot(context='paper',theme='dark',font_scale=1,colours=None,rc_kwparams=dict()):
 	'''
 	Set seaborn styling for plots. Use print(sns.axes_style()) for getting a complete list of style attributes
@@ -87,3 +96,22 @@ def prepare_plot(context='paper',theme='dark',font_scale=1,colours=None,rc_kwpar
 	sns.set_palette(sns.color_palette(colours))
 	return None
 	
+def plot_or_not(show,plot_name=None,suffix='',dpi=480,ftype='png',bbox_inches='tight'):
+	'''
+	Function to switch between show and save methods for plots.
+	Parameters	:	
+	show		- Shows an 'interactive' plot if True, else saves the plot if False. If set to None, does nothing.
+	plot_name	- If set, plot is saved using plot_name if show is set to False. If show is set to False, yet plot_name is not provided, a random number is generated for filename.
+	dpi 		- dots per inch in the saved plot, default 480.
+	ftype 		- file type of image to save, default .png.
+	bbox_inches	- bounding box layout when saving a figure, default tight layout.
+	'''
+	if show == True :
+		plt.show()
+	elif show == False :
+		if plot_name == None :
+			plot_name = np.random.randint(10000,99999)
+		plt.savefig(os.path.join(get_directory('plotter'),plot_name+str(suffix)+'.'+str(ftype)),
+			dpi=dpi,bbox_inches=bbox_inches)
+	elif show == None :
+		pass 

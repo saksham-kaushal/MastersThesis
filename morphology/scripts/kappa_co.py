@@ -3,22 +3,54 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from astropy.cosmology import FlatLambdaCDM, z_at_value
+cosmology 	= FlatLambdaCDM(100.*0.6777,Om0=0.307,Ob0=0.04825)
+
 import core
 
 # =============================== User-defined functions ======================
 
+def get_eagle_cosmology():
+	return FlatLambdaCDM(100.*0.6777,Om0=0.307,Ob0=0.04825)
+
 def get_angular_momentum(rxv, mass):
 	return np.transpose(np.multiply(mass, np.transpose(rxv)))
+
+def get_orthonormal_basis(angular_momentum_vector):
+	k = angular_momentum_vector
+
+	try:
+		nonzero_k = np.nonzero(k)[0][0]
+	except IndexError:
+		raise IndexError('Received a null angular momentum vector')
+	if nonzero_k == 0:
+		i = np.array([-k[1]/k[0],1,0])
+	else:
+		i = np.array([1,0,0])
+	
+	j = np.cross(k,i)
+	basis_vectors = np.vstack((i,j,k))
+	return basis_vectors/np.linalg.norm(basis_vectors,axis=1)[:,np.newaxis]
+
+def coordinates_transform(galaxy_coords,unit_3dvectors):
+	
+	transforms = list()
+	for coord in galaxy_coords:
+		transforms.append(np.dot(unit_3dvectors,coord))
+	return np.array(transforms)
 
 def get_kappa(coords, velocities, masses):
 	net_velocities  		= np.linalg.norm(velocities,axis=1)
 	rxv						= np.cross(coords,velocities)
 	angular_momenta  		= get_angular_momentum(rxv,masses)
 	total_angular_momentum 	= np.sum(angular_momenta,axis=0)
-	zaxis  					= total_angular_momentum/np.linalg.norm(total_angular_momentum)
-	angular_momentum_mask  	= np.dot(angular_momenta,zaxis)
+	basis_vectors 			= get_orthonormal_basis(total_angular_momentum.value)
+	coords_transform  		= coordinates_transform(coords.value,basis_vectors)*(coords.unit)
+	coords_transform[:,2] 	= 0
+	radius 					= np.linalg.norm(coords_transform,axis=1)
+	angular_momentum_mask  	= np.dot(angular_momenta,basis_vectors[2])
 	kinetic_energy  		= np.sum(masses*net_velocities**2)
-	rotational_kinetic_energy  	= np.sum((masses*net_velocities**2)[angular_momentum_mask>0])
+	rotational_kinetic_energy  	= np.sum((np.dot(angular_momenta,basis_vectors[2])**2/(masses*radius**2))[angular_momentum_mask>0])
 	kappa 					= rotational_kinetic_energy/kinetic_energy
 	return kappa.value
 
@@ -37,6 +69,24 @@ def get_kappa_thob_implementation(coords, velocities, masses):
 	kappa 			= Mvrot2 / np.sum(masses *
     				  (np.linalg.norm(velocities,axis=1))**2)			# 140
 	return kappa.value
+
+
+def kappa_plotter(kappa_co, show=True,plot_name='kappa'):
+	core.prepare_plot()
+	fig  	= plt.figure()
+	axis 	= fig.add_subplot(1,1,1)
+	secondary_axis 		= axis.twiny()
+	redshift_markers 	= [3.0,2.0,1.0,0.5,0.2,0.0]
+	corresponding_times	= core.get_time_from_redshift(redshift_markers).value
+	secondary_axis.set_xlim(axis.get_xlim())
+	secondary_axis.set_xticks(corresponding_times)
+	secondary_axis.set_xticklabels('{:02}'.format(redshift) for redshift in redshift_markers)
+	secondary_axis.set_xlabel('Redshift')
+	axis.set_xlabel('Time $[Gyr]$')
+	axis.set_ylabel('$\kappa_{CO}^{}$')
+	for assembly in kappa_co:
+		sns.lineplot(x=kappa_co[assembly].keys(),y=kappa_co[assembly].values(),ax=axis)
+	core.plot_or_not(show=show, plot_name=plot_name)
 
 
 # =============================== Main program ======================
@@ -68,22 +118,22 @@ if __name__ == '__main__':
 			coords  				= files[index]['Coordinates']*u.Mpc
 			masses 					= files[index]['Mass']*u.M_sun
 			velocities  			= files[index]['Velocity']*(u.km/u.s)
-			kappa_co_assembly[index_redshift_dict[index]] 		= get_kappa(coords,velocities, masses)
-			kappa_co_assembly_thob[index_redshift_dict[index]] 	= get_kappa_thob_implementation(coords,velocities,masses)
+			kappa_co_assembly[core.get_time_from_redshift(index_redshift_dict[index]).value] = get_kappa(coords,velocities, masses)
+			kappa_co_assembly_thob[core.get_time_from_redshift(index_redshift_dict[index]).value] = get_kappa_thob_implementation(coords,velocities,masses)
 
 		kappa_co[assembly] 		= kappa_co_assembly
 		kappa_co_thob[assembly] = kappa_co_assembly_thob
 		
+
+
 		for index in files:
 			files[index].close()
-
-	for assembly in kappa_co:
-		core.prepare_plot()
-		# sns.lineplot(x=kappa_co[assembly].keys(),y=kappa_co[assembly].values())
-		sns.lineplot(x=kappa_co_thob[assembly].keys(),y=kappa_co_thob[assembly].values())
-		plt.show()
-
+	
+	# print(kappa_co_thob)
 	print(kappa_co)
-	print(kappa_co_thob)
+
+	# kappa_plotter(kappa_co_thob,show=True,plot_name='kappa_co_thob')
+	kappa_plotter(kappa_co,show=False,plot_name='kappa_co')
+
 
 
