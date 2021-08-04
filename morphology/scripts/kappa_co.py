@@ -45,6 +45,21 @@ def get_kappa(coords, velocities, masses):
 	angular_momenta  		= get_angular_momentum(rxv,masses)
 	total_angular_momentum 	= np.sum(angular_momenta,axis=0)
 	basis_vectors 			= get_orthonormal_basis(total_angular_momentum.value)
+	velocities_transform  	= coordinates_transform(velocities.value,basis_vectors)*(velocities.unit)
+	velocities_transform[:,2]	= 0
+	net_velocities_transform 	= np.linalg.norm(velocities_transform,axis=1)
+	angular_momentum_mask  	= np.dot(angular_momenta,basis_vectors[2])
+	kinetic_energy  		= np.sum(masses*net_velocities**2)
+	rotational_kinetic_energy  	= np.sum((masses*net_velocities_transform**2)[angular_momentum_mask>0])
+	kappa 					= rotational_kinetic_energy/kinetic_energy
+	return kappa.value
+
+def get_kappa_thob_et_al(coords, velocities, masses):
+	net_velocities  		= np.linalg.norm(velocities,axis=1)
+	rxv						= np.cross(coords,velocities)
+	angular_momenta  		= get_angular_momentum(rxv,masses)
+	total_angular_momentum 	= np.sum(angular_momenta,axis=0)
+	basis_vectors 			= get_orthonormal_basis(total_angular_momentum.value)
 	coords_transform  		= coordinates_transform(coords.value,basis_vectors)*(coords.unit)
 	coords_transform[:,2] 	= 0
 	radius 					= np.linalg.norm(coords_transform,axis=1)
@@ -97,8 +112,9 @@ if __name__ == '__main__':
 	# assembly_list 			= ['Organic']
 	distance_limit  		= 0.03*u.Mpc
 
-	kappa_co 		= dict()
-	kappa_co_thob  	= dict()
+	kappa_co 				= dict()
+	kappa_co_thob  			= dict()
+	kappa_co_thob_et_al 	= dict()
 
 	for assembly in assembly_list:
 		# ------- Get HDF5 file handles list for each type of assembly and store in a dictionary.
@@ -114,16 +130,18 @@ if __name__ == '__main__':
 		index_redshift_dict  	= core.get_index_redshift_dict(assembly)
 		kappa_co_assembly  		= dict()
 		kappa_co_assembly_thob  = dict()
+		kappa_co_assembly_thob_et_al 	= dict()
 		for index in files:
 			coords  				= files[index]['Coordinates']*u.Mpc
 			masses 					= files[index]['Mass']*u.M_sun
 			velocities  			= files[index]['Velocity']*(u.km/u.s)
 			kappa_co_assembly[core.get_time_from_redshift(index_redshift_dict[index]).value] = get_kappa(coords,velocities, masses)
+			kappa_co_assembly_thob_et_al[core.get_time_from_redshift(index_redshift_dict[index]).value] = get_kappa_thob_et_al(coords,velocities, masses)
 			kappa_co_assembly_thob[core.get_time_from_redshift(index_redshift_dict[index]).value] = get_kappa_thob_implementation(coords,velocities,masses)
 
-		kappa_co[assembly] 		= kappa_co_assembly
-		kappa_co_thob[assembly] = kappa_co_assembly_thob
-		
+		kappa_co[assembly] 				= kappa_co_assembly
+		kappa_co_thob[assembly] 		= kappa_co_assembly_thob
+		kappa_co_thob_et_al[assembly] 	= kappa_co_assembly_thob_et_al
 
 
 		for index in files:
@@ -133,6 +151,7 @@ if __name__ == '__main__':
 	print(kappa_co)
 
 	# kappa_plotter(kappa_co_thob,show=True,plot_name='kappa_co_thob')
+	kappa_plotter(kappa_co_thob_et_al,show=False,plot_name='kappa_co_thob_et_al')
 	kappa_plotter(kappa_co,show=False,plot_name='kappa_co')
 
 
