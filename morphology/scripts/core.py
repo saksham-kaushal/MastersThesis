@@ -38,6 +38,13 @@ def get_directory(directory):
 
 
 def get_files(directory,fname=None,mode='r'):
+	'''
+	Returns handle(s) for hdf5 file(s). If no filename is mentioned, handles for all files in the directory are returned; for a filename or a list of filenames corresponding file handle or a list of file handles is returned.
+	Parameters	:
+	directory 	- path to the directory containing hdf5 files.
+	fname 		- name of a single or a list of hdf5 files to read. Defaults to None, so that all files in the directory are read. 
+	mode 		- mode for opening file. Defaults to read mode.
+	'''
 	# assert isinstance(fname,list), 'Pass file names as list.'
 	if fname is None:
 		return [h5py.File(os.path.join(directory,fname),mode) for fname in os.listdir(directory)]
@@ -58,24 +65,59 @@ def get_redshift(fname):
 
 
 def get_index(fname):
+	'''
+	Returns index value for an hdf5 file. Uses regex to find redshift value from filename.
+	Parameters	:
+	fname 	- Open handle for an hdf5 file.
+	'''
 	return int(re.compile(r'_\d+').findall(fname)[0].replace('_',''))
 
 
 def get_index_redshift_dict(assembly='GM-Early'):
+	'''
+	Returns a dictionary of index and redshift values from filenames for a given assembly mode.
+	Parameters	:
+	assembly 	- Assembly mode. Defaults to the GM-Early mode.
+	'''
 	assembly_dir  	= get_directory(assembly)
 	index_calibration_file_list 	= [fname for fname in os.listdir(assembly_dir)]
 	return dict(zip(map(get_index,index_calibration_file_list),map(get_redshift,index_calibration_file_list)))
 
 
 def get_time_from_redshift(redshift,cosmology=None):
+	'''
+	Returns cosmological time since big-bang from redshift value for a flat lambda-CDM cosmology utilising parameters used by EAGLE simulation suite, unless specified.
+	Parameters	:
+	assembly 	- Assembly mode. Defaults to the GM-Early mode.
+	'''
 	if cosmology is None:
 		cosmology 	= FlatLambdaCDM(100.*0.6777,Om0=0.307,Ob0=0.04825)
 	return cosmology.age(redshift) 
 
-
+def get_plot_axes_titles():
+	'''
+	Returns a dict containing plot axis titles with standard units for different physical parameter.
+	'''
+	title  									= dict()
+	title['redshift']						= 'Redshift'
+	title['net_specific_angular_momentum']	= 'Specific angular momentum (Mpc km s$^{-1}$)'
+	title['expansion_factor']				= 'Expansion factor'
+	title['net_angular_momentum']			= 'Angular momentum (Mpc M$_{\odot}$ km s$^{-1}$)'
+	title['total_kinetic_energy']			= 'Kinetic energy (M$_{\odot}$ km$^{2}$ s$^{-2}$)'
+	title['time'] 							= 'Time (Gyr)'
+	title['masses']							= 'Mass (M$_{\odot}$)'
+	title['median_radius']					= 'Median radius (Mpc)'
+	return title
+	
 def prepare_plot(context='paper',theme='dark',font_scale=1,colours=None,rc_kwparams=dict()):
 	'''
 	Set seaborn styling for plots. Use print(sns.axes_style()) for getting a complete list of style attributes
+	Parameters	:	
+	context		- seaborn plot context. Defaults to paper.
+	theme 		- seaborn plot theme. Defaults to dark theme.
+	font_scale 	- font scaling for plot text. Defaults to 1.
+	colours 	- list of plot marker colours. Defaults to None changed to magenta-green-blue later in the function.
+	rc_kwparams	- dictionary of keyword parameters to be passed as matplotlib rc paramerters (which are essentially the runtime configuration settings).
 	'''
 	rc_params	= {
 		'xtick.bottom': True, 
@@ -84,8 +126,8 @@ def prepare_plot(context='paper',theme='dark',font_scale=1,colours=None,rc_kwpar
 		'axes.spines.bottom': True
 		}
 	rc_params.update(rc_kwparams)			# Update parameters by adding parameters passed to function
-	sns.set_context(context,font_scale=font_scale)
 	sns.set(style=theme,font='TeX Gyre Pagella Math')
+	sns.set_context(context,font_scale=font_scale)
 	sns.set_style(rc_params)
 	if colours is None:
 		colours  	= [
